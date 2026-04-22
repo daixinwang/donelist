@@ -1,4 +1,4 @@
-// Fallback for using MaterialIcons on Android and web.
+// Android / Web fallback for SF Symbols → Material Icons.
 
 import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 import { SymbolWeight, SymbolViewProps } from 'expo-symbols';
@@ -8,23 +8,29 @@ import { OpaqueColorValue, type StyleProp, type TextStyle } from 'react-native';
 type IconMapping = Record<SymbolViewProps['name'], ComponentProps<typeof MaterialIcons>['name']>;
 type IconSymbolName = keyof typeof MAPPING;
 
-/**
- * Add your SF Symbols to Material Icons mappings here.
- * - see Material Icons in the [Icons Directory](https://icons.expo.fyi).
- * - see SF Symbols in the [SF Symbols](https://developer.apple.com/sf-symbols/) app.
- */
 const MAPPING = {
   'house.fill': 'home',
   'paperplane.fill': 'send',
   'chevron.left.forwardslash.chevron.right': 'code',
   'chevron.right': 'chevron-right',
+  'chevron.left': 'chevron-left',
+  'checkmark.circle.fill': 'check-circle',
+  'checkmark': 'check',
+  'chart.bar.fill': 'bar-chart',
+  'gearshape.fill': 'settings',
+  'plus': 'add',
+  'trash': 'delete',
+  'pencil': 'edit',
+  'tag.fill': 'label',
+  'xmark': 'close',
+  'square.and.arrow.up': 'ios-share',
+  'square.and.arrow.down': 'file-download',
+  'moon.fill': 'nightlight-round',
+  'sun.max.fill': 'wb-sunny',
+  'sparkles': 'auto-awesome',
+  'flame.fill': 'local-fire-department',
 } as IconMapping;
 
-/**
- * An icon component that uses native SF Symbols on iOS, and Material Icons on Android and web.
- * This ensures a consistent look across platforms, and optimal resource usage.
- * Icon `name`s are based on SF Symbols and require manual mapping to Material Icons.
- */
 export function IconSymbol({
   name,
   size = 24,

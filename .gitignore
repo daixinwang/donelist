@@ -33,6 +33,9 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Claude Code (local agent state & settings)
+.claude/
+
 # typescript
 *.tsbuildinfo
 
