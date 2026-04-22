@@ -8,11 +8,13 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useHaptics } from '@/hooks/use-haptics';
 import { useAppTheme } from '@/hooks/use-theme-color';
 import type { DoneItem } from '@/db/types';
-import { formatTime } from '@/utils/date';
+import { formatDuration, formatTimeRange } from '@/utils/date';
 
 export function DoneItemCard({ item }: { item: DoneItem }) {
   const { colors } = useAppTheme();
   const haptics = useHaptics();
+  const durationMs = item.completedAt - item.startedAt;
+  const isInstant = durationMs <= 60_000;
 
   const openEdit = () => {
     haptics.light();
@@ -40,7 +42,21 @@ export function DoneItemCard({ item }: { item: DoneItem }) {
         <View style={styles.body}>
           <ThemedText style={styles.content}>{item.content}</ThemedText>
           <View style={styles.meta}>
-            <ThemedText type="caption">{formatTime(item.completedAt)}</ThemedText>
+            <ThemedText type="caption">
+              {formatTimeRange(item.startedAt, item.completedAt)}
+            </ThemedText>
+            {!isInstant && (
+              <View
+                style={[
+                  styles.durationBadge,
+                  { backgroundColor: colors.surfaceAlt },
+                ]}>
+                <ThemedText
+                  style={{ color: colors.textMuted, fontSize: 11 }}>
+                  {formatDuration(durationMs)}
+                </ThemedText>
+              </View>
+            )}
             {item.tags.map((t) => (
               <View
                 key={t.id}
@@ -94,6 +110,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexWrap: 'wrap',
+  },
+  durationBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: Radius.pill,
   },
   tagDot: {
     paddingHorizontal: 8,

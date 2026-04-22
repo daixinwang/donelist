@@ -38,3 +38,20 @@ export function startOfWeek(ms: number = Date.now()): number {
 export function startOfMonth(ms: number = Date.now()): number {
   return dayjs(ms).startOf('month').valueOf();
 }
+
+/** Humanize a duration in ms → "30分" / "1h 30分" / "2h" / "瞬时"(<1min). */
+export function formatDuration(ms: number): string {
+  if (ms <= 60_000) return '瞬时';
+  const totalMin = Math.round(ms / 60_000);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}分`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}分`;
+}
+
+/** Format a time range: "09:00–09:30" or "09:30" if zero duration. */
+export function formatTimeRange(startedAt: number, completedAt: number): string {
+  if (completedAt - startedAt <= 60_000) return formatTime(completedAt);
+  return `${formatTime(startedAt)}–${formatTime(completedAt)}`;
+}
