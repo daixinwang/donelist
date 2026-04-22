@@ -7,40 +7,26 @@ import {
   RangeSelector,
   type RangeKey,
 } from '@/components/dashboard/range-selector';
-import { TagPieChart } from '@/components/dashboard/tag-pie-chart';
 import { TimePieChart } from '@/components/dashboard/time-pie-chart';
 import { TrendChart } from '@/components/dashboard/trend-chart';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
-import {
-  countByDay,
-  countByTag,
-  durationByTag,
-  getEarliestCompletedAt,
-  type DailyCount,
-  type TagCount,
-  type TagDuration,
-} from '@/db/queries/stats';
+import { listDoneItemsByCompletion } from '@/db/queries/done-items';
+import { durationByTag, type TagDuration } from '@/db/queries/stats';
+import type { DoneItem } from '@/db/types';
 import { useAppTheme } from '@/hooks/use-theme-color';
 import { useDoneStore } from '@/store/use-done-store';
 import { startOfWeek } from '@/utils/date';
 
 type Range = { fromMs: number; toMs: number };
 
-const rangeFor = (key: RangeKey, earliestMs: number | null): Range => {
+const rangeFor = (key: RangeKey): Range => {
   const now = dayjs();
   const endMs = now.endOf('day').add(1, 'millisecond').valueOf();
   if (key === 'week') {
     return { fromMs: startOfWeek(now.valueOf()), toMs: endMs };
   }
-  if (key === 'month') {
-    return { fromMs: now.startOf('month').valueOf(), toMs: endMs };
-  }
-  // 'all' — from the first recorded item, or just today if none yet
-  return {
-    fromMs: earliestMs ?? now.startOf('day').valueOf(),
-    toMs: endMs,
-  };
+  return { fromMs: now.startOf('month').valueOf(), toMs: endMs };
 };
 
 export default function StatsScreen() {
@@ -48,29 +34,18 @@ export default function StatsScreen() {
   const items = useDoneStore((s) => s.items);
 
   const [range, setRange] = useState<RangeKey>('week');
-  const [daily, setDaily] = useState<DailyCount[]>([]);
-  const [byTag, setByTag] = useState<TagCount[]>([]);
+  const [rangeItems, setRangeItems] = useState<DoneItem[]>([]);
   const [timeByTag, setTimeByTag] = useState<TagDuration[]>([]);
-  const [earliestMs, setEarliestMs] = useState<number | null>(null);
 
-  useEffect(() => {
-    getEarliestCompletedAt().then(setEarliestMs);
-  }, [items.length]);
-
-  const windowRange = useMemo(
-    () => rangeFor(range, earliestMs),
-    [range, earliestMs]
-  );
+  const windowRange = useMemo(() => rangeFor(range), [range]);
 
   useEffect(() => {
     (async () => {
-      const [d, t, dur] = await Promise.all([
-        countByDay(windowRange.fromMs, windowRange.toMs),
-        countByTag(windowRange.fromMs, windowRange.toMs),
+      const [rangeList, dur] = await Promise.all([
+        listDoneItemsByCompletion(windowRange.fromMs, windowRange.toMs),
         durationByTag(windowRange.fromMs, windowRange.toMs),
       ]);
-      setDaily(d);
-      setByTag(t);
+      setRangeItems(rangeList);
       setTimeByTag(dur);
     })();
   }, [windowRange, items.length]);
@@ -90,11 +65,10 @@ export default function StatsScreen() {
         </View>
 
         <TrendChart
-          data={daily}
+          items={rangeItems}
           fromMs={windowRange.fromMs}
           toMs={windowRange.toMs}
         />
-        <TagPieChart data={byTag} />
         <TimePieChart data={timeByTag} />
       </ScrollView>
     </SafeAreaView>

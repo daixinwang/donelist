@@ -4,12 +4,11 @@ import { ThemedText } from '@/components/themed-text';
 import { Radius } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-theme-color';
 
-export type RangeKey = 'week' | 'month' | 'all';
+export type RangeKey = 'week' | 'month';
 
 const OPTIONS: { key: RangeKey; label: string }[] = [
   { key: 'week', label: '本周' },
   { key: 'month', label: '本月' },
-  { key: 'all', label: '全部' },
 ];
 
 export function RangeSelector({

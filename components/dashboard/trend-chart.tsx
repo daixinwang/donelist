@@ -4,59 +4,122 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 
 import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-theme-color';
-import type { DailyCount } from '@/db/queries/stats';
+import type { DoneItem } from '@/db/types';
 
 type Props = {
-  data: DailyCount[];
+  items: DoneItem[];
   fromMs: number;
   toMs: number;
 };
 
 const WEEKDAY_SHORT = ['一', '二', '三', '四', '五', '六', '日'];
 
-export function TrendChart({ data, fromMs, toMs }: Props) {
+type StackBucket = {
+  key: string;
+  name: string;
+  color: string;
+};
+
+export function TrendChart({ items, fromMs, toMs }: Props) {
   const { colors } = useAppTheme();
   const { width } = useWindowDimensions();
 
-  const series = useMemo(() => {
-    const map = new Map(data.map((d) => [d.day, d.count]));
+  const { stackData, buckets, total, maxVal } = useMemo(() => {
     const start = dayjs(fromMs).startOf('day');
     const endExclusive = dayjs(toMs).startOf('day');
-    const days = Math.max(1, endExclusive.diff(start, 'day'));
+    const dayCount = Math.max(1, endExclusive.diff(start, 'day'));
 
-    return Array.from({ length: days }, (_, i) => {
+    // bucketKey → metadata (stable insertion order drives stack layering)
+    const bucketMeta = new Map<string, StackBucket>();
+    // dayKey → bucketKey → count
+    const byDay = new Map<string, Map<string, number>>();
+
+    for (let i = 0; i < dayCount; i++) {
+      byDay.set(start.add(i, 'day').format('YYYY-MM-DD'), new Map());
+    }
+
+    let totalCount = 0;
+    for (const it of items) {
+      if (it.completedAt < fromMs || it.completedAt >= toMs) continue;
+      const dayKey = dayjs(it.completedAt).format('YYYY-MM-DD');
+      const dayMap = byDay.get(dayKey);
+      if (!dayMap) continue;
+      totalCount += 1;
+
+      // Primary tag = first tag by sort_order, falling back to "no tag".
+      const primary = it.tags[0];
+      const bucketKey = primary ? `t${primary.id}` : '__untagged';
+      if (!bucketMeta.has(bucketKey)) {
+        bucketMeta.set(bucketKey, {
+          key: bucketKey,
+          name: primary?.name ?? '无标签',
+          color: primary?.color ?? colors.textSubtle,
+        });
+      }
+      dayMap.set(bucketKey, (dayMap.get(bucketKey) ?? 0) + 1);
+    }
+
+    // Stable bucket order: tagged first (in first-seen order), untagged last
+    const bucketList = Array.from(bucketMeta.values()).sort((a, b) => {
+      if (a.key === '__untagged') return 1;
+      if (b.key === '__untagged') return -1;
+      return 0;
+    });
+
+    let highestColumn = 1;
+    const rows: {
+      stacks: { value: number; color: string }[];
+      label: string;
+    }[] = [];
+
+    for (let i = 0; i < dayCount; i++) {
       const d = start.add(i, 'day');
-      const key = d.format('YYYY-MM-DD');
-      const value = map.get(key) ?? 0;
+      const dayKey = d.format('YYYY-MM-DD');
+      const dayMap = byDay.get(dayKey) ?? new Map();
+
+      const stacks = bucketList
+        .map((bucket) => ({
+          value: dayMap.get(bucket.key) ?? 0,
+          color: bucket.color,
+        }))
+        .filter((seg) => seg.value > 0);
+      const column = stacks.reduce((s, seg) => s + seg.value, 0);
+      if (column > highestColumn) highestColumn = column;
+
       let label = '';
-      if (days <= 7) {
-        // dayjs.day(): 0=Sun..6=Sat → convert to Mon-based index
+      if (dayCount <= 7) {
         label = WEEKDAY_SHORT[(d.day() + 6) % 7];
-      } else if (days <= 35) {
-        // monthly grid: first bar + month boundaries + every 5th day
+      } else if (dayCount <= 35) {
         if (i === 0 || d.date() === 1 || d.date() % 5 === 0) {
           label = String(d.date());
         }
       } else {
-        // long range: month boundaries only to avoid clutter
         if (i === 0 || d.date() === 1) label = d.format('M月');
       }
-      return { value, label };
-    });
-  }, [data, fromMs, toMs]);
 
-  const total = series.reduce((s, b) => s + b.value, 0);
-  const maxVal = Math.max(1, ...series.map((s) => s.value));
+      rows.push({
+        stacks:
+          stacks.length > 0
+            ? stacks
+            : [{ value: 0, color: 'transparent' }],
+        label,
+      });
+    }
 
-  // Size bars per range. For long ranges, let the chart scroll so
-  // each bar keeps enough width; squishing everything into one
-  // viewport ends up with 3-pixel bars that can't be read.
-  const count = series.length;
+    return {
+      stackData: rows,
+      buckets: bucketList,
+      total: totalCount,
+      maxVal: highestColumn,
+    };
+  }, [items, fromMs, toMs, colors.textSubtle]);
+
+  const count = stackData.length;
   const scrollable = count > 35;
   const spacing = count <= 7 ? 10 : 3;
-  const availWidth = width - Spacing.lg * 2 - 40; // container + y-axis gutter
+  const availWidth = width - Spacing.lg * 2 - 40;
   const fitWidth = (availWidth - (count - 1) * spacing) / count;
   const barWidth = scrollable
     ? 14
@@ -65,22 +128,13 @@ export function TrendChart({ data, fromMs, toMs }: Props) {
     : Math.max(6, Math.floor(fitWidth));
   const labelWidth = Math.max(barWidth + spacing, count <= 7 ? 36 : 22);
 
-  // Per-bar color: transparent for zero so the bar (and its rounded
-  // cap, if any) genuinely disappears instead of rendering as a
-  // 1-2 px artefact on the baseline.
-  const enriched = series.map((s) => ({
-    value: s.value,
-    label: s.label,
-    frontColor: s.value > 0 ? colors.primary : 'transparent',
-  }));
-
   return (
     <View style={styles.wrapper}>
       <ThemedText type="subtitle">完成趋势</ThemedText>
       <ThemedText type="caption">共 {total} 条</ThemedText>
       <View style={{ marginTop: Spacing.sm }}>
         <BarChart
-          data={enriched}
+          stackData={stackData}
           barWidth={barWidth}
           spacing={spacing}
           labelWidth={labelWidth}
@@ -100,6 +154,22 @@ export function TrendChart({ data, fromMs, toMs }: Props) {
           isAnimated
         />
       </View>
+      {buckets.length > 0 && (
+        <View style={styles.legend}>
+          {buckets.map((b) => (
+            <View key={b.key} style={styles.legendItem}>
+              <View
+                style={[styles.dot, { backgroundColor: b.color }]}
+              />
+              <ThemedText
+                type="caption"
+                style={{ color: colors.textMuted }}>
+                {b.name}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+      )}
     </View>
   );
 }
@@ -108,5 +178,21 @@ const styles = StyleSheet.create({
   wrapper: {
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
+  },
+  legend: {
+    marginTop: Spacing.sm,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 10,
+    height: 10,
+    borderRadius: Radius.pill,
   },
 });

@@ -71,26 +71,7 @@ export async function listDoneItems(params?: {
     'SELECT * FROM done_items ORDER BY completed_at DESC LIMIT ? OFFSET ?',
     [limit, offset]
   );
-  if (rows.length === 0) return [];
-
-  const ids = rows.map((r) => r.id);
-  const placeholders = ids.map(() => '?').join(',');
-  const tagRows = await db.getAllAsync<TagRow & { done_id: number }>(
-    `SELECT dt.done_id AS done_id, t.*
-     FROM done_tags dt
-     INNER JOIN tags t ON t.id = dt.tag_id
-     WHERE dt.done_id IN (${placeholders})
-     ORDER BY t.sort_order ASC`,
-    ids
-  );
-
-  const byDone = new Map<number, ReturnType<typeof toTag>[]>();
-  for (const tr of tagRows) {
-    const arr = byDone.get(tr.done_id) ?? [];
-    arr.push(toTag(tr));
-    byDone.set(tr.done_id, arr);
-  }
-  return rows.map((r) => toDoneItem(r, byDone.get(r.id) ?? []));
+  return hydrateWithTags(rows);
 }
 
 export async function listDoneItemsInRange(
@@ -105,6 +86,30 @@ export async function listDoneItemsInRange(
      ORDER BY started_at ASC`,
     [fromMs, toMs]
   );
+  return hydrateWithTags(rows);
+}
+
+/**
+ * Items whose completed_at falls within [fromMs, toMs). Differs from
+ * listDoneItemsInRange (which uses interval overlap) — this one is
+ * what stats need when attributing a task to the day it was finished.
+ */
+export async function listDoneItemsByCompletion(
+  fromMs: number,
+  toMs: number
+): Promise<DoneItem[]> {
+  const db = await getDb();
+  const rows = await db.getAllAsync<DoneItemRow>(
+    `SELECT * FROM done_items
+     WHERE completed_at >= ? AND completed_at < ?
+     ORDER BY completed_at ASC`,
+    [fromMs, toMs]
+  );
+  return hydrateWithTags(rows);
+}
+
+async function hydrateWithTags(rows: DoneItemRow[]): Promise<DoneItem[]> {
+  const db = await getDb();
   if (rows.length === 0) return [];
   const ids = rows.map((r) => r.id);
   const placeholders = ids.map(() => '?').join(',');
