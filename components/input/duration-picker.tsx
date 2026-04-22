@@ -504,6 +504,7 @@ const styles = StyleSheet.create({
   },
   addChip: {
     width: 34,
+    paddingHorizontal: 0,
     alignItems: 'center',
     justifyContent: 'center',
     borderStyle: 'dashed',
