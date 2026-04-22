@@ -10,9 +10,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ConfettiOverlay } from '@/components/common/confetti-overlay';
-import { DurationPicker } from '@/components/input/duration-picker';
 import { QuickInputBar } from '@/components/input/quick-input-bar';
-import { TagChipSelector } from '@/components/input/tag-chip-selector';
+import { QuickSaveDialog } from '@/components/input/quick-save-dialog';
 import { ThemedText } from '@/components/themed-text';
 import { TimelineList } from '@/components/timeline/timeline-list';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -23,13 +22,10 @@ import { useTagStore } from '@/store/use-tag-store';
 
 const DEFAULT_DURATION_MIN = 30;
 
-function freshRange(durationMin: number) {
-  const completedAt = Date.now();
-  return {
-    startedAt: completedAt - durationMin * 60_000,
-    completedAt,
-  };
-}
+type PendingEntry = {
+  content: string;
+  range: { startedAt: number; completedAt: number };
+};
 
 export default function HomeScreen() {
   const { colors } = useAppTheme();
@@ -37,30 +33,46 @@ export default function HomeScreen() {
   const items = useDoneStore((s) => s.items);
   const tags = useTagStore((s) => s.tags);
 
-  const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
-  const [range, setRange] = useState(() => freshRange(DEFAULT_DURATION_MIN));
+  const [text, setText] = useState('');
+  const [pending, setPending] = useState<PendingEntry | null>(null);
+  const [lastDurationMin, setLastDurationMin] = useState(DEFAULT_DURATION_MIN);
+  const [lastTagIds, setLastTagIds] = useState<number[]>([]);
   const [confettiTick, setConfettiTick] = useState(0);
 
-  const currentDurationMin = Math.max(
-    1,
-    Math.round((range.completedAt - range.startedAt) / 60_000)
-  );
-
-  const toggleTag = (id: number) =>
-    setSelectedTagIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
-    );
-
-  const handleSubmit = async (text: string) => {
-    await addItem({
-      content: text,
-      startedAt: range.startedAt,
-      completedAt: range.completedAt,
-      tagIds: selectedTagIds,
+  const handleInputSubmit = (submitted: string) => {
+    const end = Date.now();
+    setPending({
+      content: submitted,
+      range: {
+        startedAt: end - lastDurationMin * 60_000,
+        completedAt: end,
+      },
     });
+  };
+
+  const handleConfirm = async ({
+    startedAt,
+    completedAt,
+    tagIds,
+  }: {
+    startedAt: number;
+    completedAt: number;
+    tagIds: number[];
+  }) => {
+    if (!pending) return;
+    await addItem({
+      content: pending.content,
+      startedAt,
+      completedAt,
+      tagIds,
+    });
+    setLastDurationMin(
+      Math.max(1, Math.round((completedAt - startedAt) / 60_000))
+    );
+    setLastTagIds(tagIds);
+    setPending(null);
+    setText('');
     setConfettiTick((n) => n + 1);
-    // refresh end=now for next entry, keep duration choice
-    setRange(freshRange(currentDurationMin));
   };
 
   return (
@@ -92,22 +104,28 @@ export default function HomeScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
         style={{ flex: 1 }}>
-        <QuickInputBar onSubmit={handleSubmit} />
-        <TagChipSelector
-          tags={tags}
-          selectedIds={selectedTagIds}
-          onToggle={toggleTag}
+        <QuickInputBar
+          value={text}
+          onChangeText={setText}
+          onSubmit={handleInputSubmit}
         />
-        <View style={{ paddingTop: 4, paddingBottom: Spacing.sm }}>
-          <DurationPicker
-            compact
-            startedAt={range.startedAt}
-            completedAt={range.completedAt}
-            onChange={setRange}
-          />
-        </View>
         <TimelineList items={items} />
       </KeyboardAvoidingView>
+
+      <QuickSaveDialog
+        visible={pending !== null}
+        content={pending?.content ?? ''}
+        tags={tags}
+        defaultRange={
+          pending?.range ?? {
+            startedAt: Date.now() - lastDurationMin * 60_000,
+            completedAt: Date.now(),
+          }
+        }
+        defaultTagIds={lastTagIds}
+        onCancel={() => setPending(null)}
+        onConfirm={handleConfirm}
+      />
 
       <ConfettiOverlay trigger={confettiTick} />
     </SafeAreaView>

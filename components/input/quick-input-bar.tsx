@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import {
   Keyboard,
   Pressable,
@@ -13,29 +13,34 @@ import { useHaptics } from '@/hooks/use-haptics';
 import { useAppTheme } from '@/hooks/use-theme-color';
 
 type Props = {
+  value: string;
+  onChangeText: (text: string) => void;
   onSubmit: (text: string) => void | Promise<void>;
   placeholder?: string;
+  /** If true (default), dismisses the keyboard when ✓ is tapped. */
+  dismissKeyboardOnSubmit?: boolean;
 };
 
 export function QuickInputBar({
+  value,
+  onChangeText,
   onSubmit,
   placeholder = '记下刚刚完成的事…',
+  dismissKeyboardOnSubmit = true,
 }: Props) {
   const { colors } = useAppTheme();
   const haptics = useHaptics();
-  const [text, setText] = useState('');
   const inputRef = useRef<TextInput>(null);
 
   const handleSubmit = async () => {
-    const trimmed = text.trim();
+    const trimmed = value.trim();
     if (!trimmed) return;
-    haptics.success();
+    haptics.light();
+    if (dismissKeyboardOnSubmit) Keyboard.dismiss();
     await onSubmit(trimmed);
-    setText('');
-    Keyboard.dismiss();
   };
 
-  const canSubmit = text.trim().length > 0;
+  const canSubmit = value.trim().length > 0;
 
   return (
     <View
@@ -48,8 +53,8 @@ export function QuickInputBar({
       ]}>
       <TextInput
         ref={inputRef}
-        value={text}
-        onChangeText={setText}
+        value={value}
+        onChangeText={onChangeText}
         onSubmitEditing={handleSubmit}
         placeholder={placeholder}
         placeholderTextColor={colors.textSubtle}

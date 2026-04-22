@@ -20,6 +20,12 @@ type Props = {
   chipDurationsMin?: number[];
   /** Show full date for each endpoint (used in edit modal). */
   showFullDate?: boolean;
+  /**
+   * Time-only mode: picker shows a wheel for HH:mm, date portion of
+   * the underlying value is preserved. Use when the task is known to
+   * belong to a single fixed day (e.g. "record what I just finished").
+   */
+  timeOnly?: boolean;
 };
 
 const DEFAULT_CHIPS = [15, 30, 60, 120];
@@ -31,6 +37,7 @@ export function DurationPicker({
   compact,
   chipDurationsMin = DEFAULT_CHIPS,
   showFullDate,
+  timeOnly,
 }: Props) {
   const { colors } = useAppTheme();
   const haptics = useHaptics();
@@ -51,11 +58,41 @@ export function DurationPicker({
 
   const openPicker = (target: 'start' | 'end') => {
     haptics.light();
-    setPicker({ target, mode: Platform.OS === 'ios' ? 'date' : 'date' });
+    setPicker({
+      target,
+      mode: timeOnly ? 'time' : 'date',
+    });
+  };
+
+  const applyChange = (target: 'start' | 'end', next: number) => {
+    if (target === 'start') {
+      const clamped = Math.min(next, completedAt);
+      onChange({ startedAt: clamped, completedAt });
+    } else {
+      const clamped = Math.max(next, startedAt);
+      onChange({ startedAt, completedAt: clamped });
+    }
+  };
+
+  /** Merge HH:mm from `picked` into the existing value (preserving date). */
+  const mergeTime = (target: 'start' | 'end', picked: Date) => {
+    const prev = target === 'start' ? startedAt : completedAt;
+    const merged = new Date(prev);
+    merged.setHours(picked.getHours(), picked.getMinutes(), 0, 0);
+    applyChange(target, merged.getTime());
   };
 
   const handlePicked = (_e: DateTimePickerEvent, date?: Date) => {
     if (!picker) return;
+
+    if (timeOnly) {
+      // Single time picker on both platforms. Android dismisses after
+      // the callback; iOS inline spinner keeps firing until picker closes.
+      if (Platform.OS === 'android') setPicker(null);
+      if (date) mergeTime(picker.target, date);
+      return;
+    }
+
     if (Platform.OS === 'android' && picker.mode === 'date') {
       if (!date) {
         setPicker(null);
@@ -70,26 +107,11 @@ export function DurationPicker({
     }
     if (Platform.OS === 'android' && picker.mode === 'time') {
       setPicker(null);
-      if (!date) return;
-      const prev = picker.target === 'start' ? startedAt : completedAt;
-      const merged = new Date(prev);
-      merged.setHours(date.getHours(), date.getMinutes(), 0, 0);
-      applyChange(picker.target, merged.getTime());
+      if (date) mergeTime(picker.target, date);
       return;
     }
-    // iOS: single inline picker handles date+time at once
+    // iOS inline datetime
     if (date) applyChange(picker.target, date.getTime());
-  };
-
-  const applyChange = (target: 'start' | 'end', next: number) => {
-    if (target === 'start') {
-      // start must be <= end
-      const clamped = Math.min(next, completedAt);
-      onChange({ startedAt: clamped, completedAt });
-    } else {
-      const clamped = Math.max(next, startedAt);
-      onChange({ startedAt, completedAt: clamped });
-    }
   };
 
   return (
@@ -167,7 +189,17 @@ export function DurationPicker({
         </Pressable>
       </View>
 
-      {picker && Platform.OS === 'ios' && (
+      {picker && timeOnly && (
+        <DateTimePicker
+          value={new Date(picker.target === 'start' ? startedAt : completedAt)}
+          mode="time"
+          display="spinner"
+          is24Hour
+          onChange={handlePicked}
+          themeVariant={colors.background === '#1C211E' ? 'dark' : 'light'}
+        />
+      )}
+      {picker && !timeOnly && Platform.OS === 'ios' && (
         <DateTimePicker
           value={new Date(picker.target === 'start' ? startedAt : completedAt)}
           mode="datetime"
@@ -176,7 +208,7 @@ export function DurationPicker({
           themeVariant={colors.background === '#1C211E' ? 'dark' : 'light'}
         />
       )}
-      {picker && Platform.OS !== 'ios' && (
+      {picker && !timeOnly && Platform.OS !== 'ios' && (
         <DateTimePicker
           value={new Date(picker.target === 'start' ? startedAt : completedAt)}
           mode={picker.mode}
