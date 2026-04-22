@@ -139,7 +139,32 @@ export default function ItemEditScreen() {
           />
         </View>
 
-        <SectionLabel>标签</SectionLabel>
+        <View style={styles.sectionHeader}>
+          <ThemedText type="muted">标签</ThemedText>
+          <Pressable
+            onPress={() => router.push('/settings')}
+            hitSlop={8}
+            style={({ pressed }) => [
+              styles.manageTagsBtn,
+              {
+                borderColor: colors.border,
+                backgroundColor: colors.surface,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+            accessibilityLabel="管理标签">
+            <ThemedText
+              type="caption"
+              style={{ color: colors.textMuted }}>
+              管理标签
+            </ThemedText>
+            <IconSymbol
+              name="chevron.right"
+              size={14}
+              color={colors.textMuted}
+            />
+          </Pressable>
+        </View>
         <TagChipSelector
           tags={tags}
           selectedIds={selectedTagIds}
@@ -200,5 +225,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingVertical: 12,
     borderRadius: Radius.md,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.lg,
+    paddingBottom: Spacing.sm,
+  },
+  manageTagsBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingLeft: 10,
+    paddingRight: 6,
+    paddingVertical: 4,
+    borderRadius: Radius.pill,
+    borderWidth: 1,
   },
 });
