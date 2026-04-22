@@ -62,6 +62,13 @@ export default function RootLayout() {
               title: '编辑已办',
             }}
           />
+          <Stack.Screen
+            name="settings"
+            options={{
+              presentation: 'modal',
+              headerShown: false,
+            }}
+          />
         </Stack>
         <StatusBar style="auto" />
       </ThemeProvider>

@@ -10,6 +10,7 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      initialRouteName="index"
       screenOptions={{
         tabBarActiveTintColor: colors.tabIconSelected,
         tabBarInactiveTintColor: colors.tabIconDefault,
@@ -21,15 +22,6 @@ export default function TabLayout() {
         },
       }}>
       <Tabs.Screen
-        name="index"
-        options={{
-          title: '已办',
-          tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="checkmark.circle.fill" color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="stats"
         options={{
           title: '统计',
@@ -39,11 +31,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="settings"
+        name="index"
         options={{
-          title: '设置',
+          title: '已办',
           tabBarIcon: ({ color }) => (
-            <IconSymbol size={26} name="gearshape.fill" color={color} />
+            <IconSymbol size={28} name="checkmark.circle.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="week"
+        options={{
+          title: '周视图',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={26} name="calendar" color={color} />
           ),
         }}
       />

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -14,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { TagManager } from '@/components/settings/tag-manager';
 import { ThemedText } from '@/components/themed-text';
+import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Radius, Spacing } from '@/constants/theme';
 import { exportAll, importAll, wipeAll, type BackupPayload } from '@/db/queries/backup';
 import { useHaptics } from '@/hooks/use-haptics';
@@ -134,8 +136,24 @@ export default function SettingsScreen() {
       style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: Spacing.xxl * 2 }}>
         <View style={styles.header}>
-          <ThemedText type="title">设置</ThemedText>
-          <ThemedText type="muted">按你的节奏来。</ThemedText>
+          <View style={{ flex: 1, gap: 4 }}>
+            <ThemedText type="title">设置</ThemedText>
+            <ThemedText type="muted">按你的节奏来。</ThemedText>
+          </View>
+          <Pressable
+            onPress={() => router.back()}
+            hitSlop={12}
+            style={({ pressed }) => [
+              styles.closeButton,
+              {
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
+                opacity: pressed ? 0.7 : 1,
+              },
+            ]}
+            accessibilityLabel="关闭设置">
+            <IconSymbol name="xmark" size={18} color={colors.textMuted} />
+          </Pressable>
         </View>
 
         <Section title="外观">
@@ -299,10 +317,20 @@ function ActionRow({
 
 const styles = StyleSheet.create({
   header: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     paddingBottom: Spacing.xs,
-    gap: 4,
+    gap: Spacing.md,
+  },
+  closeButton: {
+    width: 38,
+    height: 38,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   section: {
     paddingHorizontal: Spacing.lg,

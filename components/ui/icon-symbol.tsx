@@ -29,6 +29,9 @@ const MAPPING = {
   'sun.max.fill': 'wb-sunny',
   'sparkles': 'auto-awesome',
   'flame.fill': 'local-fire-department',
+  'calendar': 'calendar-today',
+  'arrow.left': 'arrow-back',
+  'arrow.right': 'arrow-forward',
 } as IconMapping;
 
 export function IconSymbol({
