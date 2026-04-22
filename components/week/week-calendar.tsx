@@ -14,10 +14,12 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useAppTheme } from '@/hooks/use-theme-color';
 import type { DoneItem } from '@/db/types';
 
-const HOUR_HEIGHT = 56;
-const AXIS_WIDTH = 44;
+const HOUR_HEIGHT = 40;
+const AXIS_WIDTH = 36;
 const HOURS = Array.from({ length: 24 }, (_, i) => i);
-const MIN_BLOCK_HEIGHT = 16;
+const MIN_BLOCK_HEIGHT = 14;
+/** Hour placed at the top of the viewport when the screen first opens. */
+const INITIAL_SCROLL_HOUR = 9;
 
 type Props = {
   /** UTC ms for 00:00 of the Monday (week start). */
@@ -80,17 +82,15 @@ export function WeekCalendar({ weekStartMs, items }: Props) {
     return list;
   }, [items, start, colors.primary]);
 
-  // Auto-scroll to earliest block or 7:00 on week change
+  // Anchor 09:00 at the top whenever the week changes; leave earlier
+  // hours a swipe away instead of dictating where to look.
   useEffect(() => {
-    const firstTop = blocks.length
-      ? Math.min(...blocks.map((b) => b.top))
-      : 7 * HOUR_HEIGHT;
-    const y = Math.max(0, firstTop - HOUR_HEIGHT);
+    const y = INITIAL_SCROLL_HOUR * HOUR_HEIGHT;
     const t = setTimeout(() => {
       scrollRef.current?.scrollTo({ y, animated: false });
     }, 60);
     return () => clearTimeout(t);
-  }, [weekStartMs, blocks]);
+  }, [weekStartMs]);
 
   // Tick the now indicator every minute
   useEffect(() => {
@@ -199,22 +199,6 @@ export function WeekCalendar({ weekStartMs, items }: Props) {
                 }}
               />
             ))}
-            {/* Vertical day dividers */}
-            {days.map((_, i) =>
-              i === 0 ? null : (
-                <View
-                  key={`v${i}`}
-                  style={{
-                    position: 'absolute',
-                    top: 0,
-                    bottom: 0,
-                    left: i * dayColumnWidth,
-                    width: 1,
-                    backgroundColor: colors.border,
-                  }}
-                />
-              )
-            )}
             {/* Task blocks */}
             {blocks.map((b, idx) => (
               <Pressable
