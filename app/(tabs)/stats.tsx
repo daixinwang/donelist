@@ -22,11 +22,19 @@ type Range = { fromMs: number; toMs: number };
 
 const rangeFor = (key: RangeKey): Range => {
   const now = dayjs();
-  const endMs = now.endOf('day').add(1, 'millisecond').valueOf();
   if (key === 'week') {
-    return { fromMs: startOfWeek(now.valueOf()), toMs: endMs };
+    // Full Mon–Sun so future days still show on the x-axis.
+    const weekStart = startOfWeek(now.valueOf());
+    return {
+      fromMs: weekStart,
+      toMs: dayjs(weekStart).add(7, 'day').valueOf(),
+    };
   }
-  return { fromMs: now.startOf('month').valueOf(), toMs: endMs };
+  // Full 1st–last day of the month.
+  return {
+    fromMs: now.startOf('month').valueOf(),
+    toMs: now.startOf('month').add(1, 'month').valueOf(),
+  };
 };
 
 export default function StatsScreen() {

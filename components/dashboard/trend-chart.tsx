@@ -1,6 +1,6 @@
 import dayjs from 'dayjs';
 import { useMemo } from 'react';
-import { StyleSheet, View, useWindowDimensions } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { BarChart } from 'react-native-gifted-charts';
 
 import { ThemedText } from '@/components/themed-text';
@@ -128,18 +128,57 @@ export function TrendChart({ items, fromMs, toMs }: Props) {
     : Math.max(6, Math.floor(fitWidth));
   const labelWidth = Math.max(barWidth + spacing, count <= 7 ? 36 : 22);
 
+  // gifted-charts 对每个柱子都渲染一个 labelWidth+spacing 宽的 label 容器，
+  // 柱子密集时相邻容器严重重叠，2 位数 label 会被 RN 的 Text 截断成 "…"。
+  // 改用 labelComponent 画一个比容器更宽的 View，让文字溢出容器但居中对齐柱子。
+  const LABEL_BOX = 40;
+  const labelMarginLeft = (barWidth + spacing) / 2 - LABEL_BOX / 2;
+  const chartStackData = useMemo(
+    () =>
+      stackData.map((row) => {
+        if (!row.label) {
+          return { stacks: row.stacks, label: '' };
+        }
+        return {
+          stacks: row.stacks,
+          label: '',
+          labelComponent: () => (
+            <View
+              style={{
+                width: LABEL_BOX,
+                marginLeft: labelMarginLeft,
+                alignItems: 'center',
+              }}>
+              <Text
+                style={{
+                  color: colors.textSubtle,
+                  fontSize: 10,
+                }}
+                numberOfLines={1}>
+                {row.label}
+              </Text>
+            </View>
+          ),
+        };
+      }),
+    [stackData, labelMarginLeft, colors.textSubtle]
+  );
+
   return (
     <View style={styles.wrapper}>
       <ThemedText type="subtitle">完成趋势</ThemedText>
       <ThemedText type="caption">共 {total} 条</ThemedText>
       <View style={{ marginTop: Spacing.sm }}>
         <BarChart
-          stackData={stackData}
+          // gifted-charts 的 RenderStackBars 动画 useEffect 依赖为空，
+          // 数据后到时柱子高度会卡在 0；用 key 强制在数据变化时 remount。
+          key={`${fromMs}-${toMs}-${total}-${maxVal}`}
+          stackData={chartStackData}
           barWidth={barWidth}
           spacing={spacing}
           labelWidth={labelWidth}
-          noOfSections={Math.min(4, Math.max(1, maxVal))}
-          maxValue={maxVal}
+          noOfSections={Math.min(4, Math.max(2, maxVal))}
+          maxValue={Math.max(2, maxVal)}
           yAxisThickness={0}
           xAxisThickness={0}
           yAxisTextStyle={{ color: colors.textSubtle, fontSize: 10 }}
