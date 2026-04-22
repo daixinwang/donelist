@@ -1,17 +1,21 @@
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
-export const SCHEMA_SQL = `
+/** Initial schema for a fresh install. */
+export const INITIAL_SCHEMA_SQL = `
 PRAGMA foreign_keys = ON;
 
 CREATE TABLE IF NOT EXISTS done_items (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   content TEXT NOT NULL,
+  started_at INTEGER NOT NULL,
   completed_at INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_done_completed_at
   ON done_items(completed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_done_started_at
+  ON done_items(started_at DESC);
 
 CREATE TABLE IF NOT EXISTS tags (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -34,3 +38,13 @@ CREATE TABLE IF NOT EXISTS app_meta (
   value TEXT
 );
 `;
+
+/** Migration from v1 → v2: add started_at column, backfill equal to completed_at. */
+export const MIGRATIONS: Record<number, string> = {
+  2: `
+    ALTER TABLE done_items ADD COLUMN started_at INTEGER;
+    UPDATE done_items SET started_at = completed_at WHERE started_at IS NULL;
+    CREATE INDEX IF NOT EXISTS idx_done_started_at
+      ON done_items(started_at DESC);
+  `,
+};

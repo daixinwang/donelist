@@ -61,9 +61,11 @@ export async function importAll(payload: BackupPayload): Promise<{
       );
     }
     for (const it of payload.items) {
+      const startedAt =
+        (it as { started_at?: number }).started_at ?? it.completed_at;
       await db.runAsync(
-        'INSERT INTO done_items (id, content, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-        [it.id, it.content, it.completed_at, it.created_at, it.updated_at]
+        'INSERT INTO done_items (id, content, started_at, completed_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)',
+        [it.id, it.content, startedAt, it.completed_at, it.created_at, it.updated_at]
       );
       for (const tagId of it.tag_ids) {
         await db.runAsync(

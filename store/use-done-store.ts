@@ -12,10 +12,20 @@ type DoneState = {
   loading: boolean;
   loaded: boolean;
   refresh: () => Promise<void>;
-  add: (content: string, tagIds: number[]) => Promise<DoneItem>;
+  add: (params: {
+    content: string;
+    startedAt?: number;
+    completedAt?: number;
+    tagIds: number[];
+  }) => Promise<DoneItem>;
   update: (
     id: number,
-    patch: { content?: string; completedAt?: number; tagIds?: number[] }
+    patch: {
+      content?: string;
+      startedAt?: number;
+      completedAt?: number;
+      tagIds?: number[];
+    }
   ) => Promise<void>;
   remove: (id: number) => Promise<void>;
 };
@@ -35,8 +45,8 @@ export const useDoneStore = create<DoneState>((set, get) => ({
     }
   },
 
-  add: async (content, tagIds) => {
-    const item = await createDoneItem({ content, tagIds });
+  add: async (params) => {
+    const item = await createDoneItem(params);
     set({ items: [item, ...get().items] });
     return item;
   },
