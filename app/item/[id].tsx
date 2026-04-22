@@ -1,6 +1,3 @@
-import DateTimePicker, {
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
 import { router, useLocalSearchParams, Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -14,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { DurationPicker } from '@/components/input/duration-picker';
 import { TagChipSelector } from '@/components/input/tag-chip-selector';
 import { ThemedText } from '@/components/themed-text';
 import { IconSymbol } from '@/components/ui/icon-symbol';
@@ -23,7 +21,6 @@ import { useHaptics } from '@/hooks/use-haptics';
 import { useAppTheme } from '@/hooks/use-theme-color';
 import { useDoneStore } from '@/store/use-done-store';
 import { useTagStore } from '@/store/use-tag-store';
-import { formatFullDateTime } from '@/utils/date';
 
 export default function ItemEditScreen() {
   const { id: idParam } = useLocalSearchParams<{ id: string }>();
@@ -35,10 +32,11 @@ export default function ItemEditScreen() {
   const remove = useDoneStore((s) => s.remove);
 
   const [content, setContent] = useState('');
-  const [completedAt, setCompletedAt] = useState<number>(Date.now());
+  const [range, setRange] = useState<{ startedAt: number; completedAt: number }>(
+    { startedAt: Date.now() - 30 * 60_000, completedAt: Date.now() }
+  );
   const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(true);
-  const [pickerMode, setPickerMode] = useState<'date' | 'time' | null>(null);
 
   useEffect(() => {
     if (!Number.isFinite(id)) return;
@@ -46,7 +44,7 @@ export default function ItemEditScreen() {
       const item = await getDoneItem(id);
       if (item) {
         setContent(item.content);
-        setCompletedAt(item.completedAt);
+        setRange({ startedAt: item.startedAt, completedAt: item.completedAt });
         setSelectedTagIds(item.tags.map((t) => t.id));
       }
       setLoading(false);
@@ -66,7 +64,8 @@ export default function ItemEditScreen() {
     haptics.success();
     await update(id, {
       content: content.trim(),
-      completedAt,
+      startedAt: range.startedAt,
+      completedAt: range.completedAt,
       tagIds: selectedTagIds,
     });
     router.back();
@@ -85,11 +84,6 @@ export default function ItemEditScreen() {
         },
       },
     ]);
-  };
-
-  const onPickerChange = (_e: DateTimePickerEvent, date?: Date) => {
-    if (Platform.OS === 'android') setPickerMode(null);
-    if (date) setCompletedAt(date.getTime());
   };
 
   if (loading) {
@@ -137,49 +131,14 @@ export default function ItemEditScreen() {
           ]}
         />
 
-        <SectionLabel>完成时间</SectionLabel>
-        <Pressable
-          onPress={() =>
-            setPickerMode(Platform.OS === 'ios' ? 'date' : 'date')
-          }
-          style={[
-            styles.row,
-            {
-              backgroundColor: colors.surface,
-              borderColor: colors.border,
-            },
-          ]}>
-          <ThemedText>{formatFullDateTime(completedAt)}</ThemedText>
-          <ThemedText type="caption">点击修改</ThemedText>
-        </Pressable>
-        {Platform.OS === 'ios' && pickerMode && (
-          <DateTimePicker
-            value={new Date(completedAt)}
-            mode="datetime"
-            display="inline"
-            onChange={onPickerChange}
-            themeVariant={colors.background === '#1C211E' ? 'dark' : 'light'}
+        <View style={{ paddingTop: Spacing.lg }}>
+          <DurationPicker
+            startedAt={range.startedAt}
+            completedAt={range.completedAt}
+            onChange={setRange}
+            showFullDate
           />
-        )}
-        {Platform.OS !== 'ios' && pickerMode && (
-          <DateTimePicker
-            value={new Date(completedAt)}
-            mode={pickerMode}
-            is24Hour
-            onChange={(e, d) => {
-              if (pickerMode === 'date' && d) {
-                setPickerMode('time');
-                setCompletedAt((prev) => {
-                  const nd = new Date(prev);
-                  nd.setFullYear(d.getFullYear(), d.getMonth(), d.getDate());
-                  return nd.getTime();
-                });
-              } else {
-                onPickerChange(e, d);
-              }
-            }}
-          />
-        )}
+        </View>
 
         <SectionLabel>标签</SectionLabel>
         <TagChipSelector
@@ -233,15 +192,6 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     fontSize: 16,
     textAlignVertical: 'top',
-  },
-  row: {
-    marginHorizontal: Spacing.lg,
-    padding: Spacing.md,
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
   },
   deleteButton: {
     flexDirection: 'row',
