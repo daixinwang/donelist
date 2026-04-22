@@ -136,7 +136,6 @@ export default function ItemEditScreen() {
             startedAt={range.startedAt}
             completedAt={range.completedAt}
             onChange={setRange}
-            showFullDate
           />
         </View>
 
