@@ -1,6 +1,6 @@
 import * as SQLite from 'expo-sqlite';
 import { defaultTags } from '@/constants/default-tags';
-import { INITIAL_SCHEMA_SQL, MIGRATIONS, SCHEMA_VERSION } from '@/db/schema';
+import { INITIAL_SCHEMA_SQL, SCHEMA_VERSION } from '@/db/schema';
 
 const DB_NAME = 'donelist.db';
 
@@ -9,11 +9,17 @@ let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 export function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
-      const db = await SQLite.openDatabaseAsync(DB_NAME);
-      await db.execAsync(INITIAL_SCHEMA_SQL);
-      await runMigrations(db);
-      await seedIfNeeded(db);
-      return db;
+      try {
+        const db = await SQLite.openDatabaseAsync(DB_NAME);
+        await db.execAsync(INITIAL_SCHEMA_SQL);
+        await runMigrations(db);
+        await seedIfNeeded(db);
+        return db;
+      } catch (err) {
+        // Don't cache a rejected promise — next call retries.
+        dbPromise = null;
+        throw err;
+      }
     })();
   }
   return dbPromise;
@@ -34,20 +40,41 @@ async function writeVersion(db: SQLite.SQLiteDatabase, v: number) {
   );
 }
 
+type MigrationFn = (db: SQLite.SQLiteDatabase) => Promise<void>;
+
+const MIGRATIONS: Record<number, MigrationFn> = {
+  2: migrateToV2,
+};
+
+/**
+ * v1 → v2: introduce started_at. Guarded with PRAGMA table_info so
+ * the ALTER is safe if a previous (broken) run already added the
+ * column but failed before bumping the stored version.
+ */
+async function migrateToV2(db: SQLite.SQLiteDatabase) {
+  const cols = await db.getAllAsync<{ name: string }>(
+    'PRAGMA table_info(done_items)'
+  );
+  const hasStartedAt = cols.some((c) => c.name === 'started_at');
+  if (!hasStartedAt) {
+    await db.execAsync(
+      'ALTER TABLE done_items ADD COLUMN started_at INTEGER'
+    );
+  }
+  await db.execAsync(
+    "UPDATE done_items SET started_at = completed_at WHERE started_at IS NULL"
+  );
+  await db.execAsync(
+    'CREATE INDEX IF NOT EXISTS idx_done_started_at ON done_items(started_at DESC)'
+  );
+}
+
 async function runMigrations(db: SQLite.SQLiteDatabase) {
   const current = await readVersion(db);
   if (current === SCHEMA_VERSION) return;
-
-  // Fresh install: INITIAL_SCHEMA_SQL already created latest shape; just stamp version.
-  if (current === 0) {
-    await writeVersion(db, SCHEMA_VERSION);
-    return;
-  }
-
   for (let v = current + 1; v <= SCHEMA_VERSION; v++) {
-    const sql = MIGRATIONS[v];
-    if (!sql) continue;
-    await db.execAsync(sql);
+    const fn = MIGRATIONS[v];
+    if (fn) await fn(db);
     await writeVersion(db, v);
   }
 }
