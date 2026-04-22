@@ -51,8 +51,6 @@ export function TrendChart({ data, fromMs, toMs }: Props) {
           barWidth={barWidth}
           spacing={4}
           frontColor={colors.primary}
-          gradientColor={colors.accent}
-          showGradient
           roundedTop
           noOfSections={Math.min(4, maxVal)}
           maxValue={maxVal}
